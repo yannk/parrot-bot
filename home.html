@@ -1,0 +1,29 @@
+<html><head>
+    <title>Home of Parrot HTTP-IRC Gateway bot</title>
+</head>
+<body>
+    <h1>Parrot HTTP-IRC Gateway</h1>
+
+    <p>I'm not a very smart IRC bot.</p>
+    <p>My implementation is available on <a href="http://github.com/yannk">GitHub</a></p>
+    <p>I'm a HTTP-IRC gateway, to help the code communicate with its team owner.</p>
+    <p>
+    You can currently find me as {{.Nick}} on the current channels of {{.IrcAddress}}:
+    <ul>
+        {{range .Channels}}
+        <li>{{.}}</li>
+        {{end}}
+    </ul>
+
+<p>Here is how to make me send a message to a channel:
+<pre>
+
+# network address in this example is guessed from http-address command line argument: {{.HttpAddress}}
+curl -XPOST {{.Url}}/post/ops -d "msg=INFO: Hello World, people of channel Ops"
+
+ -or-
+
+# entire payload is the message, just make sure Content-Type is not multipart or urlencoded
+curl -XPOST {{.Url}}/post/chatter -H 'Content-Type:' -d "INFO: Awesomeness level 5"
+</body>
+</html>
