@@ -10,13 +10,15 @@ messages relayed to IRC.
 
 This is very useful in an engineering organisation as a multi-purpose
 messaging bot. Specifically, it allows any application or system to talk to
-responsible engineers because it's so simple.
+its respective owners because anyone can speak HTTP.
 
 # Usage
 
-  $ make
-  $ ./parrot --irc-server=irc.corp.com --http-address=:8080 --default-channel=ops
-  $ curl http://localhost:8080/  # show further instructions
+    $ make
+    $ ./parrot --irc-server=irc.corp.com --http-address=:8080 --default-channel=ops
+    $ curl http://localhost:8080/  # show further instructions
+
+    $ curl -XPOST http://localhost:8080/post/ops -d "msg=INFO: The roof is on fire."
 
 # History
 
