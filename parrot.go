@@ -2,9 +2,9 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"flag"
 	"fmt"
-	irc "github.com/fluffle/goirc/client"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -14,15 +14,21 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	irc "github.com/fluffle/goirc/client"
 )
 
 const CONN_RETRY_DELAY = 3
 
-var useSyslog = flag.Bool("syslog", false, "Log to syslog")
-var nick *string = flag.String("nick", "parrot", "bot's nickname")
-var ircAddress *string = flag.String("irc-address", "irc.freenode.net", "IRC server address")
-var defaultChannel *string = flag.String("default-channel", "parrot", "default channel for messages, and initial channel")
-var httpAddress *string = flag.String("http-address", ":5555", "TCP address of the HTTP server")
+var (
+	useSyslog      = flag.Bool("syslog", false, "Log to syslog")
+	nick           = flag.String("nick", "parrot", "bot's nickname")
+	nickPassword   = flag.String("nickpassword", "", "nickserv password")
+	ircAddress     = flag.String("irc-address", "irc.freenode.net", "IRC server address")
+	ircSSL         = flag.Bool("ssl", false, "Connect with SSL")
+	defaultChannel = flag.String("default-channel", "parrot", "default channel for messages, and initial channel")
+	httpAddress    = flag.String("http-address", ":5555", "TCP address of the HTTP server")
+)
 
 // The struct going from the HTTP go routine to the IRC channel by the Bridge chan
 type ChannelMessage struct {
@@ -37,7 +43,7 @@ type IRCBridge struct {
 }
 
 func (irc *IRCBridge) Channels() []string {
-	return irc.Client.Me.ChannelsStr()
+	return irc.Client.Me().ChannelsStr()
 }
 
 // goroutine blocking on receiving messages and emitting them to the appropriate chan
@@ -54,7 +60,8 @@ func (irc *IRCBridge) recv() {
 
 func (irc *IRCBridge) Emit(channel string, message string) {
 	// join channels we don't track
-	if _, isOn := irc.Client.ST.IsOn(channel, irc.Client.Me.Nick); !isOn {
+	if _, isOn := irc.Client.StateTracker().IsOn(channel, irc.Client.Me().Nick); !isOn {
+		log.Println("Joining", channel)
 		irc.Client.Join(channel)
 	}
 	irc.Client.Privmsg(channel, message)
@@ -83,7 +90,7 @@ func (irc *IRCBridge) ReceiveHTTPMessage(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Can't acknowledge this message
-	if !irc.Client.Connected {
+	if !irc.Client.Connected() {
 		log.Printf("Couldn't send '%s' to channel %s on behalf of %s",
 			bytes.Replace(msg, []byte("\n"), []byte("\\n"), -1),
 			channel,
@@ -109,7 +116,13 @@ func (irc *IRCBridge) connectRetry() {
 
 func (irc *IRCBridge) connect() (err error) {
 	log.Printf("Connecting to IRC %s", irc.IrcAddress)
-	if err = irc.Client.Connect(irc.IrcAddress); err != nil {
+
+	irc.Client.Config().Server = irc.IrcAddress
+	if *ircSSL {
+		irc.Client.Config().SSL = true
+		irc.Client.Config().SSLConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+	if err = irc.Client.Connect(); err != nil {
 		log.Printf("Connection error: %s\n", err)
 	}
 	return
@@ -147,30 +160,39 @@ func main() {
 	// keep track of channels we're on (and much more we don't need)
 	c.EnableStateTracking()
 
-	c.AddHandler("connected",
+	c.HandleFunc("connected",
 		func(conn *irc.Conn, line *irc.Line) {
 			conn.Join(fmt.Sprintf("#%s", *defaultChannel))
 			log.Printf("Connected")
+			if len(*nickPassword) > 0 {
+				conn.Privmsg("NickServ", "IDENTIFY "+*nickPassword)
+			}
 		})
-	c.AddHandler("disconnected",
+	c.HandleFunc("disconnected",
 		func(conn *irc.Conn, line *irc.Line) {
 			conn.Join(fmt.Sprintf("#%s", *defaultChannel))
 			log.Printf("Oops got disconnected, retrying to connect...")
 			go parrot.connectRetry()
 		})
-	c.AddHandler("PRIVMSG",
+
+	c.HandleFunc("NOTICE",
+		func(conn *irc.Conn, line *irc.Line) {
+			log.Printf("NOTICE: %s", line.Raw)
+		})
+
+	c.HandleFunc("PRIVMSG",
 		func(conn *irc.Conn, line *irc.Line) {
 			channel := line.Args[0]
 			message := line.Args[1]
 			standardDisclaimer := fmt.Sprintf("I'm not very smart, see %s", url)
 			r, err := regexp.Compile(fmt.Sprintf("(?i:%s|%s|parrot)(?::|,)",
 				regexp.QuoteMeta(*nick),
-				regexp.QuoteMeta(conn.Me.Nick)))
+				regexp.QuoteMeta(conn.Me().Nick)))
 			if err != nil {
-				log.Printf("err: %s, %s\n", conn.Me.Nick, err)
+				log.Printf("err: %s, %s\n", conn.Me().Nick, err)
 				return
 			}
-			if channel == conn.Me.Nick {
+			if channel == conn.Me().Nick {
 				log.Printf("%s said to me %s: %s\n", line.Nick, channel, message)
 				conn.Privmsg(line.Nick, standardDisclaimer)
 			} else if r.MatchString(message) {
@@ -192,7 +214,7 @@ func main() {
 			HttpAddress string
 			IrcAddress  string
 		}{
-			parrot.Client.Me.Nick,
+			parrot.Client.Me().Nick,
 			parrot.Channels(),
 			url,
 			*httpAddress,
