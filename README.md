@@ -28,3 +28,7 @@ Say Media for some time. Parrot is my first real Go project.
 # Author
 
 Yann Kerherve <yann.kerherve@gmail.com>
+
+# Contributors
+
+Ask Bjørn Hansen <ask@develooper.com>
