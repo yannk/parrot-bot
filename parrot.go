@@ -43,7 +43,11 @@ type IRCBridge struct {
 }
 
 func (irc *IRCBridge) Channels() []string {
-	return irc.Client.Me().ChannelsStr()
+	cs := make([]string, 0)
+	for ch := range irc.Client.Me().Channels {
+		cs = append(cs, ch)
+	}
+	return cs
 }
 
 // goroutine blocking on receiving messages and emitting them to the appropriate chan
