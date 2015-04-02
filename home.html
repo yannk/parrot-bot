@@ -6,7 +6,10 @@
 
     <p>I'm not a very smart IRC bot.</p>
     <p>My implementation is available on <a href="http://github.com/yannk/parrot-bot">GitHub</a></p>
-    <p>I'm a HTTP-IRC gateway, to help the code communicate with its team owner.</p>
+    <p>I'm a HTTP-IRC gateway, I was originally created so that systems could easily talk to DevOps</p>
+    <p>It's easy to hook it up with "web-hooks"</p>
+
+    {{if .Channels}}
     <p>
     You can currently find me as {{.Nick}} on the current channels of {{.IrcAddress}}:
     <ul>
@@ -14,16 +17,18 @@
         <li>{{.}}</li>
         {{end}}
     </ul>
+    {{else}}
+    <p>I'm not currently on any channel</p>
+    {{end}}
 
 <p>Here is how to make me send a message to a channel:
 <pre>
 
-# network address in this example is guessed from http-address command line argument: {{.HttpAddress}}
-curl -XPOST {{.Url}}/post/ops -d "msg=INFO: Hello World, people of channel Ops"
+curl -XPOST {{.Url}}/post/ops -d "msg=INFO: deployment of frobnicator completed"
 
  -or-
 
 # entire payload is the message, just make sure Content-Type is not multipart or urlencoded
-curl -XPOST {{.Url}}/post/chatter -H 'Content-Type:' -d "INFO: Awesomeness level 5"
+curl -XPOST {{.Url}}/post/frobnicator-dev -H 'Content-Type:' -d "3 code reviews pending for more than 24 hours"
 </body>
 </html>
