@@ -28,6 +28,7 @@ var (
 	ircSSL         = flag.Bool("ssl", false, "Connect with SSL")
 	defaultChannel = flag.String("default-channel", "parrot", "default channel for messages, and initial channel")
 	httpAddress    = flag.String("http-address", ":5555", "TCP address of the HTTP server")
+	httpURL        = flag.String("http-url", "", "HTTP URL to contact the bot, and to post message")
 )
 
 // The struct going from the HTTP go routine to the IRC channel by the Bridge chan
@@ -135,11 +136,9 @@ func (irc *IRCBridge) connect() (err error) {
 func main() {
 	flag.Parse()
 
-	// Find our URL
-	hostname, _ := os.Hostname()
-	re, _ := regexp.Compile(`:(\d)+$`)
-	port := re.Find([]byte(*httpAddress))
-	url := fmt.Sprintf("http://%s%s", hostname, port)
+	if *httpURL == "" {
+		log.Fatal("Please specify the HTTP URL for the end user to use -http-url=...")
+	}
 
 	if *useSyslog {
 		sl, err := syslog.New(syslog.LOG_INFO, "parrot")
@@ -188,7 +187,7 @@ func main() {
 		func(conn *irc.Conn, line *irc.Line) {
 			channel := line.Args[0]
 			message := line.Args[1]
-			standardDisclaimer := fmt.Sprintf("I'm not very smart, see %s", url)
+			standardDisclaimer := fmt.Sprintf("I'm not very smart, see %s", *httpURL)
 			r, err := regexp.Compile(fmt.Sprintf("(?i:%s|%s|parrot)(?::|,)",
 				regexp.QuoteMeta(*nick),
 				regexp.QuoteMeta(conn.Me().Nick)))
@@ -220,7 +219,7 @@ func main() {
 		}{
 			parrot.Client.Me().Nick,
 			parrot.Channels(),
-			url,
+			*httpURL,
 			*httpAddress,
 			parrot.IrcAddress,
 		}
